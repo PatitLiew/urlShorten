@@ -44,23 +44,27 @@ app.post('/api/shorturl', async function(req, res) {
   const url = urlParser.parse(req.body.url);
   const hostname = String(url.hostname);
 
-  // Check if the URL follows the valid format using a regular expression
-  const urlPattern = /^(http:\/\/(www\.)?|https:\/\/(www\.)?)([A-Za-z0-9-]+\.[A-Za-z]{2,})$/;
-  if (!urlPattern.test(req.body.url)) {
-    return res.status(400).json({error: 'invalid url'}); // Invalid URL format
-  }
-
-  dns.lookup(hostname, (err1, result) => {
-    if(err1) return console.log({error: 'invalid url'});
+  dns.lookup(hostname, (err1, address) => {
+    if(err1) return res.json({error: 'invalid url'});
+    console.log(address);
   });
 
-  var shortenUrl = await URL.countDocuments();
-  shortenUrl = shortenUrl + 1;
+  const existingUrlEntry = await URL.findOne({ oldUrl: url.href });
 
-  urlEntry = URL({oldUrl: url.href,newUrl: shortenUrl});
+  if (existingUrlEntry) {
+      // If the URL already exists, return the existing short URL
+    res.json({ original_url: url.href, short_url: existingUrlEntry.newUrl });
+  } else {
+  // If the URL is not in the database, generate a new short URL
+    const shortenUrl = await URL.countDocuments() + 1;
+  
 
-  urlEntry.save();
-  res.json({original_url: url.href,short_url: shortenUrl});
+    // Create a new document and save it to the database
+    const urlEntry = new URL({ oldUrl: url.href, newUrl: shortenUrl });
+    await urlEntry.save();
+
+    res.json({original_url: url.href,short_url: shortenUrl});
+  };
 });
 
 // Your first API endpoint
